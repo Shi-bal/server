@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VenomX Snake Model Tester</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 2.5em;
+        }
+        
+        .header p {
+            color: #7f8c8d;
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+        
+        .upload-section {
+            border: 3px dashed #bdc3c7;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-section:hover {
+            border-color: #3498db;
+            background-color: #f8f9fa;
+        }
+        
+        .upload-section.dragover {
+            border-color: #2ecc71;
+            background-color: #d5f4e6;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(45deg, #3498db, #2ecc71);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        
+        .results-section {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        
+        .image-preview {
+            text-align: center;
+        }
+        
+        .image-preview img {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        
+        .detection-box {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .bbox {
+            position: absolute;
+            border: 3px solid #e74c3c;
+            border-radius: 5px;
+            background: rgba(231, 76, 60, 0.1);
+        }
+        
+        .bbox-label {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            background: #e74c3c;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .results-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #3498db;
+        }
+        
+        .result-item {
+            background: white;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        
+        .result-label {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .result-value {
+            color: #34495e;
+            font-size: 1.1em;
+        }
+        
+        .confidence {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        
+        .snake-info {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        
+        .snake-info h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.4em;
+        }
+        
+        .reference-image-section {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            text-align: center;
+        }
+        
+        .reference-image-section h4 {
+            color: #2c3e50;
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
+        
+        .reference-image-section img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .reference-image-section p {
+            margin: 10px 0 0 0;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        
+        .danger-level {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        
+        .danger-high {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .danger-medium {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .danger-low {
+            background: #2ecc71;
+            color: white;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #7f8c8d;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐍 VenomX Snake Model Tester</h1>
+            <p>Upload a snake image to test detection and classification models</p>
+        </div>
+        
+        <div class="upload-section" id="uploadSection">
+            <h3>📸 Select or Drop Snake Image</h3>
+            <p>Supports JPG, PNG, and other common image formats</p>
+            <input type="file" id="fileInput" class="file-input" accept="image/*">
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                Choose Image
+            </button>
+            <p style="margin-top: 15px; color: #7f8c8d;">or drag and drop an image here</p>
+        </div>
+        
+        <div class="results-section" id="resultsSection">
+            <h2>🔍 Analysis Results</h2>
+            <div class="results-grid">
+                <div class="image-preview">
+                    <h3>📷 Uploaded Image</h3>
+                    <div class="detection-box" id="detectionBox">
+                        <img id="previewImage" src="" alt="Uploaded snake image">
+                    </div>
+                </div>
+                
+                <div class="results-panel">
+                    <h3>🤖 AI Analysis</h3>
+                    
+                    <div class="result-item">
+                        <div class="result-label">Detection Status</div>
+                        <div class="result-value" id="detectionStatus">-</div>
+                    </div>
+                    
+                    <div class="result-item">
+                        <div class="result-label">Species Classification</div>
+                        <div class="result-value" id="classification">-</div>
+                    </div>
+                    
+                    <div class="result-item">
+                        <div class="result-label">Confidence Score</div>
+                        <div class="result-value" id="confidence">-</div>
+                    </div>
+                    
+                    <div id="snakeInfo" class="snake-info" style="display: none;">
+                        <h3 id="snakeName">-</h3>
+                        <p><strong>Scientific Name:</strong> <span id="scientificName">-</span></p>
+                        <p><strong>Fang Type:</strong> <span id="fangType">-</span></p>
+                        <div class="danger-level" id="dangerLevel">-</div>
+                        <p id="description">-</p>
+                        
+                        <!-- Reference Image Section -->
+                        <div id="referenceImageSection" class="reference-image-section" style="display: none;">
+                            <h4>📚 Reference Image</h4>
+                            <img id="referenceImage" src="" alt="Snake reference image">
+                            <p>This is what this snake species typically looks like</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="loadingSection" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyzing snake image with AI models...</p>
+        </div>
+        
+        <div id="errorSection" class="error" style="display: none;">
+            <strong>Error:</strong> <span id="errorMessage"></span>
+        </div>
+    </div>
+    
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadSection = document.getElementById('uploadSection');
+        const resultsSection = document.getElementById('resultsSection');
+        const loadingSection = document.getElementById('loadingSection');
+        const errorSection = document.getElementById('errorSection');
+        const previewImage = document.getElementById('previewImage');
+        const detectionBox = document.getElementById('detectionBox');
+        
+        // Drag and drop functionality
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+        
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+        
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('Please select a valid image file');
+                return;
+            }
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewImage.onload = () => {
+                    // Analyze the image
+                    analyzeImage(file);
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        async function analyzeImage(file) {
+            showLoading();
+            
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            try {
+                const response = await fetch('/test-model', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                displayResults(result);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Failed to analyze image: ' + error.message);
+            }
+        }
+        
+        function displayResults(result) {
+            console.log('Received result:', result); // Debug log
+            
+            hideLoading();
+            hideError();
+            resultsSection.style.display = 'block';
+            
+            // Clear previous bounding boxes
+            const existingBoxes = detectionBox.querySelectorAll('.bbox');
+            existingBoxes.forEach(box => box.remove());
+            
+            // Detection status
+            document.getElementById('detectionStatus').textContent = 
+                result.detection_success ? '✅ Snake Detected' : '❌ No Snake Detected';
+            
+            // Classification
+            const classificationText = result.species || 'Not identified';
+            document.getElementById('classification').textContent = classificationText;
+            
+            // Confidence
+            const confidenceText = result.confidence ? 
+                `${(result.confidence * 100).toFixed(1)}%` : 'N/A';
+            document.getElementById('confidence').innerHTML = 
+                `<span class="confidence">${confidenceText}</span>`;
+            
+            // Draw bounding box if detected
+            if (result.detection_success && result.bounding_box) {
+                drawBoundingBox(result.bounding_box, result.species, result.confidence);
+            }
+            
+            // Snake information
+            console.log('Snake info check:', result.snake_info); // Debug log
+            if (result.snake_info) {
+                displaySnakeInfo(result.snake_info);
+            } else {
+                console.log('No snake info in result');
+                document.getElementById('snakeInfo').style.display = 'none';
+            }
+        }
+        
+        function drawBoundingBox(bbox, label, confidence) {
+            const img = previewImage;
+            const imgRect = img.getBoundingClientRect();
+            const containerRect = detectionBox.getBoundingClientRect();
+            
+            // Calculate scale
+            const scaleX = img.offsetWidth / img.naturalWidth;
+            const scaleY = img.offsetHeight / img.naturalHeight;
+            
+            // Create bounding box element
+            const box = document.createElement('div');
+            box.className = 'bbox';
+            
+            // Position and size the box
+            const left = bbox.x1 * scaleX;
+            const top = bbox.y1 * scaleY;
+            const width = (bbox.x2 - bbox.x1) * scaleX;
+            const height = (bbox.y2 - bbox.y1) * scaleY;
+            
+            box.style.left = left + 'px';
+            box.style.top = top + 'px';
+            box.style.width = width + 'px';
+            box.style.height = height + 'px';
+            
+            // Add label
+            const labelEl = document.createElement('div');
+            labelEl.className = 'bbox-label';
+            labelEl.textContent = `${label} (${(confidence * 100).toFixed(1)}%)`;
+            box.appendChild(labelEl);
+            
+            detectionBox.appendChild(box);
+        }
+        
+        function displaySnakeInfo(snake) {
+            console.log('Displaying snake info:', snake); // Debug log
+            
+            const snakeInfo = document.getElementById('snakeInfo');
+            document.getElementById('snakeName').textContent = snake.common_name || 'Unknown';
+            document.getElementById('scientificName').textContent = snake.scientific_name || 'Unknown';
+            document.getElementById('fangType').textContent = snake.fang_type || 'Unknown';
+            document.getElementById('description').textContent = snake.description || 'No description available';
+            
+            // Danger level
+            const dangerLevel = document.getElementById('dangerLevel');
+            const level = (snake.danger_level || 'unknown').toLowerCase();
+            
+            // Map danger levels to CSS classes
+            let dangerClass = 'danger-low';
+            let dangerText = 'Unknown Risk';
+            
+            if (level.includes('venomous') && !level.includes('non')) {
+                dangerClass = 'danger-high';
+                dangerText = 'Venomous';
+            } else if (level.includes('mildly')) {
+                dangerClass = 'danger-medium';
+                dangerText = 'Mildly Venomous';
+            } else if (level.includes('non')) {
+                dangerClass = 'danger-low';
+                dangerText = 'Non-Venomous';
+            }
+            
+            dangerLevel.textContent = dangerText;
+            dangerLevel.className = 'danger-level ' + dangerClass;
+            
+            // Reference image
+            const referenceImageSection = document.getElementById('referenceImageSection');
+            const referenceImage = document.getElementById('referenceImage');
+            
+            console.log('Reference image URL:', snake.reference_image_url); // Debug log
+            
+            if (snake.reference_image_url) {
+                referenceImage.src = snake.reference_image_url;
+                referenceImage.onerror = () => {
+                    console.error('Failed to load reference image:', snake.reference_image_url);
+                    referenceImageSection.style.display = 'none';
+                };
+                referenceImageSection.style.display = 'block';
+            } else {
+                console.log('No reference image URL provided');
+                referenceImageSection.style.display = 'none';
+            }
+            
+            snakeInfo.style.display = 'block';
+        }
+        
+        function showLoading() {
+            resultsSection.style.display = 'none';
+            errorSection.style.display = 'none';
+            loadingSection.style.display = 'block';
+        }
+        
+        function hideLoading() {
+            loadingSection.style.display = 'none';
+        }
+        
+        function showError(message) {
+            hideLoading();
+            document.getElementById('errorMessage').textContent = message;
+            errorSection.style.display = 'block';
+        }
+        
+        function hideError() {
+            errorSection.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
