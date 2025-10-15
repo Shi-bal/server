@@ -150,7 +150,7 @@ class DatabaseManager:
             # Process and format results
             facilities = []
             for stock in facilities_stock.data:
-                if stock.get('facilities') and stock['facilities'].get('is_verified'):
+                if stock.get('facilities'):
                     facility = stock['facilities']
                     antivenom = stock.get('antivenoms', {})
                     
@@ -215,7 +215,7 @@ class DatabaseManager:
                             JOIN antivenoms a ON fas.antivenom_id = a.antivenom_id
                             JOIN antivenom_snake_targets ast ON a.antivenom_id = ast.antivenom_id
                             WHERE ast.snake_id = $1 
-                            AND f.is_verified = true
+                            -- AND f.is_verified = true
                             AND fas.quantity > 0
                             AND (fas.expiration_date IS NULL OR fas.expiration_date > CURRENT_DATE)
                             ORDER BY f.facility_name
@@ -264,8 +264,7 @@ class DatabaseManager:
                     latitude,
                     longitude,
                     contact_number,
-                    facility_email,
-                    is_verified
+                    facility_email
                 ),
                 antivenoms(
                     antivenom_id,
@@ -288,7 +287,7 @@ class DatabaseManager:
             facilities = []
             for stock in response.data:
                 facility = stock.get('facilities')
-                if not facility or not facility.get('is_verified'):
+                if not facility:
                     continue
                 
                 # Check if antivenom matches the requested type
@@ -372,7 +371,7 @@ class DatabaseManager:
                     JOIN antivenom_snake_targets ast ON a.antivenom_id = ast.antivenom_id
                     JOIN snakes s ON ast.snake_id = s.snake_id
                     WHERE LOWER(a.product_name) ILIKE LOWER($1)
-                    AND f.is_verified = true
+                    -- AND f.is_verified = true
                     AND fas.quantity > 0
                     AND (fas.expiration_date IS NULL OR fas.expiration_date > CURRENT_DATE)
                     GROUP BY f.facility_id, f.facility_name, f.facility_type, f.region, 

@@ -134,6 +134,7 @@ class RouteInfo(BaseModel):
     fallback: Optional[bool] = False
     note: Optional[str] = None
     error: Optional[str] = None
+    geometry: Optional[dict] = None  # GeoJSON LineString for polyline
 
 
 class AntivenomInfo(BaseModel):

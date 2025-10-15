@@ -1,8 +1,3 @@
-"""
-Antivenom finder router for VenomX API.
-Handles antivenom location and facility finding with distance calculation.
-"""
-
 import logging
 import time
 import asyncio

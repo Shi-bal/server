@@ -42,7 +42,7 @@ class OSRMClient:
             # Construct OSRM route URL
             url = f"{self.base_url}/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}"
             params = {
-                "overview": "false",  # Don't need full geometry
+                "overview": "full",  # Get full geometry for polyline
                 "alternatives": "false",
                 "steps": "false",
                 "geometries": "geojson"
@@ -62,11 +62,10 @@ class OSRMClient:
                     raise ValueError("No routes found")
                 
                 route = routes[0]  # Take the first route
-                
+                geometry = route.get("geometry")  # GeoJSON LineString
                 # Extract route information
                 distance_meters = route.get("distance", 0)
                 duration_seconds = route.get("duration", 0)
-                
                 return {
                     "success": True,
                     "distance_meters": distance_meters,
@@ -76,7 +75,8 @@ class OSRMClient:
                     "duration_hours": round(duration_seconds / 3600, 2),
                     "formatted_duration": self._format_duration(duration_seconds),
                     "start_coordinates": [start_lat, start_lon],
-                    "end_coordinates": [end_lat, end_lon]
+                    "end_coordinates": [end_lat, end_lon],
+                    "geometry": geometry
                 }
                 
         except httpx.TimeoutException:
