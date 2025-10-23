@@ -51,11 +51,11 @@ class AntivenomFinderRequest(BaseModel):
         description="User's current longitude"
     )
     
-    # Distance filter (optional)
+    # Distance filter (optional - None means no limit)
     max_distance_km: Optional[float] = Field(
-        default=100, 
+        default=None, 
         gt=0, 
-        description="Maximum search distance in kilometers"
+        description="Maximum search distance in kilometers (None = no limit, returns all facilities sorted by distance)"
     )
 
 
@@ -114,9 +114,12 @@ class SnakeInfo(BaseModel):
     snake_id: int
     scientific_name: str
     common_name: Optional[str]
+    family: Optional[str]
     fang_type: Optional[str]
+    length: Optional[str]
     description: Optional[str]
     danger_level: Optional[str]
+    rarity: Optional[str]
     image_url: Optional[str]
 
 
@@ -161,6 +164,7 @@ class FacilityInfo(BaseModel):
     longitude: Optional[float]
     contact_number: Optional[str]
     facility_email: Optional[str]
+    image_url: Optional[str]
     antivenoms: List[AntivenomInfo]
     route_info: Optional[RouteInfo]
 
@@ -193,6 +197,8 @@ class SnakeIdResponse(BaseModel):
     processing_time_seconds: Optional[float]
     image_processed: str
     model_info: Optional[Dict[str, Any]]
+    
+    model_config = {"protected_namespaces": ()}
 
 
 class AntivenomFinderResponse(BaseModel):
@@ -208,7 +214,7 @@ class AntivenomFinderResponse(BaseModel):
     facilities: List[FacilityInfo]
     
     # Metadata
-    search_radius_km: float
+    search_radius_km: Optional[float]  # None means no distance limit
     user_location: List[float]  # [lat, lon]
     processing_time_seconds: Optional[float]
 
@@ -226,7 +232,7 @@ class FacilityListResponse(BaseModel):
     facilities: List[FacilityInfo]
     
     # Metadata
-    search_radius_km: float
+    search_radius_km: Optional[float]  # None means no distance limit
     user_location: List[float]  # [lat, lon]
     processing_time_seconds: Optional[float]
 

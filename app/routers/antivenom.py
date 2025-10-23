@@ -137,23 +137,116 @@ async def find_antivenom(request: AntivenomFinderRequest):
         
         # Check if any facilities found
         if not facilities_data:
-            processing_time = time.time() - start_time
-            return AntivenomFinderResponse(
-                success=True,
-                message="No facilities found with antivenom for this snake species",
-                search_criteria={
-                    "snake_id": snake_id,
-                    "snake_common_name": request.snake_common_name,
-                    "antivenom_type": request.antivenom_type,
-                    "user_location": [request.user_latitude, request.user_longitude],
-                    "max_distance_km": request.max_distance_km
-                },
-                facilities_found=0,
-                facilities=[],
-                search_radius_km=request.max_distance_km,
-                user_location=[request.user_latitude, request.user_longitude],
-                processing_time_seconds=round(processing_time, 2)
-            )
+            # FALLBACK: If no facilities with specific antivenom found, get nearest facilities
+            logger.info("No facilities with specific antivenom found. Fetching nearest facilities as fallback...")
+            
+            try:
+                # Get all facilities to show as fallback
+                all_facilities = await db_manager.get_all_facilities()
+                
+                if not all_facilities:
+                    processing_time = time.time() - start_time
+                    return AntivenomFinderResponse(
+                        success=True,
+                        message="No facilities found in the system",
+                        search_criteria={
+                            "snake_id": snake_id,
+                            "snake_common_name": request.snake_common_name,
+                            "antivenom_type": request.antivenom_type,
+                            "user_location": [request.user_latitude, request.user_longitude],
+                            "max_distance_km": request.max_distance_km
+                        },
+                        facilities_found=0,
+                        facilities=[],
+                        search_radius_km=request.max_distance_km,
+                        user_location=[request.user_latitude, request.user_longitude],
+                        processing_time_seconds=round(processing_time, 2)
+                    )
+                
+                # Calculate distances to all facilities
+                osrm_client = get_osrm_client()
+                fallback_facilities = []
+                
+                for facility in all_facilities:
+                    try:
+                        if not facility.get("latitude") or not facility.get("longitude"):
+                            continue
+                        
+                        route_info = await osrm_client.get_route_with_fallback(
+                            request.user_latitude,
+                            request.user_longitude,
+                            facility["latitude"],
+                            facility["longitude"]
+                        )
+                        
+                        # Create facility info without antivenom data
+                        facility_info = FacilityInfo(
+                            facility_id=facility["facility_id"],
+                            facility_name=facility["facility_name"],
+                            facility_type=facility.get("facility_type"),
+                            region=facility.get("region"),
+                            province=facility.get("province"),
+                            city_municipality=facility.get("city_municipality"),
+                            address=facility.get("address"),
+                            latitude=facility.get("latitude"),
+                            longitude=facility.get("longitude"),
+                            contact_number=facility.get("contact_number"),
+                            facility_email=facility.get("facility_email"),
+                            image_url=facility.get("image_url"),
+                            antivenoms=[],  # No antivenom for this snake
+                            route_info=RouteInfo(**route_info) if route_info.get("success") else None
+                        )
+                        
+                        fallback_facilities.append({
+                            "facility": facility_info,
+                            "distance_km": route_info.get("distance_km", float('inf'))
+                        })
+                    except Exception as e:
+                        logger.error(f"Error processing fallback facility: {e}")
+                        continue
+                
+                # Sort by distance and get top 5 nearest
+                fallback_facilities.sort(key=lambda x: x["distance_km"])
+                nearest_facilities = [item["facility"] for item in fallback_facilities[:5]]
+                
+                processing_time = time.time() - start_time
+                
+                return AntivenomFinderResponse(
+                    success=True,
+                    message=f"No facilities with specific antivenom found. Showing {len(nearest_facilities)} nearest facilities. Please contact them for alternative treatment options.",
+                    search_criteria={
+                        "snake_id": snake_id,
+                        "snake_common_name": request.snake_common_name,
+                        "antivenom_type": request.antivenom_type,
+                        "user_location": [request.user_latitude, request.user_longitude],
+                        "max_distance_km": request.max_distance_km
+                    },
+                    facilities_found=len(nearest_facilities),
+                    facilities=nearest_facilities,
+                    search_radius_km=request.max_distance_km,
+                    user_location=[request.user_latitude, request.user_longitude],
+                    processing_time_seconds=round(processing_time, 2)
+                )
+                
+            except Exception as e:
+                logger.error(f"Error fetching fallback facilities: {e}")
+                processing_time = time.time() - start_time
+                return AntivenomFinderResponse(
+                    success=True,
+                    message="No facilities found with antivenom for this snake species",
+                    search_criteria={
+                        "snake_id": snake_id,
+                        "snake_common_name": request.snake_common_name,
+                        "antivenom_type": request.antivenom_type,
+                        "user_location": [request.user_latitude, request.user_longitude],
+                        "max_distance_km": request.max_distance_km
+                    },
+                    facilities_found=0,
+                    facilities=[],
+                    search_radius_km=request.max_distance_km,
+                    user_location=[request.user_latitude, request.user_longitude],
+                    processing_time_seconds=round(processing_time, 2)
+                )
         
         # Step 3: Calculate distances and prepare facility info
         logger.info(f"Calculating distances for {len(facilities_data)} facilities")
@@ -206,6 +299,7 @@ async def find_antivenom(request: AntivenomFinderRequest):
                     longitude=facility_data.get("longitude"),
                     contact_number=facility_data.get("contact_number"),
                     facility_email=facility_data.get("facility_email"),
+                    image_url=facility_data.get("image_url"),
                     antivenoms=[antivenom_info],
                     route_info=RouteInfo(**route_info) if route_info.get("success") else None
                 )
@@ -415,6 +509,7 @@ async def get_facilities_with_antivenom(request: FacilityListRequest):
                     longitude=facility_data.get("longitude"),
                     contact_number=facility_data.get("contact_number"),
                     facility_email=facility_data.get("facility_email"),
+                    image_url=facility_data.get("image_url"),
                     antivenoms=group_data["antivenoms"],
                     route_info=RouteInfo(**route_info) if route_info.get("success") else None
                 )

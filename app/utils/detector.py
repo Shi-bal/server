@@ -42,6 +42,37 @@ class SnakeDetector:
             logger.error(f"Failed to load detection model: {e}")
             raise
     
+    def detect_and_crop(self, image_path: str, confidence_threshold: float = 0.5):
+        """
+        Detect snake and return the first detection with its cropped image path.
+        This is the method called by the snake_id endpoint.
+        
+        Args:
+            image_path: Path to the input image
+            confidence_threshold: Minimum confidence score for detection
+            
+        Returns:
+            Tuple of (detection_result_dict, cropped_image_path_or_None)
+        """
+        # Use the existing detect_snake logic
+        result = self.detect_snake(image_path, confidence_threshold)
+        
+        # Extract the first detection's cropped path if available
+        cropped_path = None
+        if result.get("success") and result.get("detections"):
+            first_detection = result["detections"][0]
+            cropped_path = first_detection.get("cropped_image_path")
+        
+        # Return format expected by snake_id endpoint
+        detection_result = {
+            "detected": result.get("success", False),
+            "confidence": result["detections"][0]["confidence"] if result.get("detections") else 0.0,
+            "message": result.get("message", ""),
+            "detections": result.get("detections", [])
+        }
+        
+        return detection_result, cropped_path
+    
     def detect_snake(self, image_path: str, confidence_threshold: float = 0.5) -> Dict[str, Any]:
         """
         Detect snake using OBB and create perspective-corrected crops.
@@ -151,6 +182,20 @@ class SnakeDetector:
                 "error": str(e),
                 "detections": []
             }
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """
+        Get information about the detection model.
+        
+        Returns:
+            Dict containing model information
+        """
+        return {
+            "model_type": "YOLOv8s-OBB",
+            "model_path": settings.detection_model_path,
+            "device": self.device,
+            "task": "Oriented Bounding Box Detection with Perspective Transform"
+        }
 
 
 # Global detector instance
@@ -164,16 +209,33 @@ def get_detector() -> SnakeDetector:
     return _detector
 
 
-def cleanup_temp_files():
-    """Clean up temporary cropped images"""
+def cleanup_temp_files(file_list=None):
+    """
+    Clean up temporary cropped images.
+    
+    Args:
+        file_list: Optional list of specific file paths to delete.
+                   If None, cleans all crop_*.jpg files in temp directory.
+    """
     try:
-        temp_dir = "temp"
-        if os.path.exists(temp_dir):
-            for file in os.listdir(temp_dir):
-                if file.startswith("crop_") and file.endswith(".jpg"):
+        if file_list:
+            # Delete specific files from the list
+            for file_path in file_list:
+                if os.path.exists(file_path):
                     try:
-                        os.remove(os.path.join(temp_dir, file))
-                    except:
-                        pass
+                        os.remove(file_path)
+                        logger.debug(f"Deleted temp file: {file_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to delete {file_path}: {e}")
+        else:
+            # Clean all crop files in temp directory
+            temp_dir = "temp"
+            if os.path.exists(temp_dir):
+                for file in os.listdir(temp_dir):
+                    if file.startswith("crop_") and file.endswith(".jpg"):
+                        try:
+                            os.remove(os.path.join(temp_dir, file))
+                        except Exception as e:
+                            logger.warning(f"Failed to delete {file}: {e}")
     except Exception as e:
         logger.warning(f"Failed to cleanup temp files: {e}")

@@ -80,10 +80,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Include routers
+# Include routers BEFORE mounting static files
 app.include_router(snake_id.router, prefix="/api/v1", tags=["Snake Identification"])
 app.include_router(antivenom.router, prefix="/api/v1", tags=["Antivenom Finder"])
 
@@ -183,18 +180,24 @@ async def test_snake_model_direct(image: UploadFile = File(...)):
                                 "snake_id": snake_data.get("snake_id"),
                                 "common_name": snake_data.get("common_name", species_name),
                                 "scientific_name": snake_data.get("scientific_name", species_name),
+                                "family": snake_data.get("family", "Unknown"),
                                 "fang_type": snake_data.get("fang_type", "Unknown"),
-                                "danger_level": snake_data.get("danger_level", "unknown"),
+                                "length": snake_data.get("length", "Unknown"),
                                 "description": snake_data.get("description", f"Species identified as {species_name}"),
-                                "reference_image_url": snake_data.get("image_url"),  # Include reference image
+                                "danger_level": snake_data.get("danger_level", "unknown"),
+                                "rarity": snake_data.get("rarity", "Unknown"),
+                                "reference_image_url": snake_data.get("image_url"),
                             }
                         else:
                             result["snake_info"] = {
                                 "common_name": species_name,
                                 "scientific_name": species_name,
+                                "family": "Unknown",
                                 "fang_type": "Unknown",
-                                "danger_level": "unknown",
+                                "length": "Unknown",
                                 "description": f"Species identified as {species_name} with {(result['confidence']*100):.1f}% confidence using OBB detection and perspective-corrected classification.",
+                                "danger_level": "unknown",
+                                "rarity": "Unknown",
                                 "reference_image_url": None,
                             }
                         
@@ -255,6 +258,9 @@ async def test_snake_model_direct(image: UploadFile = File(...)):
                 "description": f"Endpoint error: {str(e)}"
             }
         }
+
+# Mount static files AFTER all route definitions to avoid catching API routes
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

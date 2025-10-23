@@ -46,6 +46,88 @@ class SnakeClassifier:
             raise
     
     
+    def classify_with_confidence_analysis(self, image_path: str, top_k: int = 5) -> Dict[str, Any]:
+        """
+        Classify snake species with detailed confidence analysis for top-k predictions.
+        This is the method called by the snake_id endpoint.
+        
+        Args:
+            image_path: Path to the image to classify
+            top_k: Number of top predictions to return
+            
+        Returns:
+            Dict with success status, predictions array, and best_prediction
+        """
+        try:
+            if not os.path.exists(image_path):
+                return {
+                    "success": False,
+                    "error": "Image not found",
+                    "predictions": [],
+                    "best_prediction": None
+                }
+            
+            # Run classification
+            cls_results = self.model.predict(image_path)[0]
+            
+            # Check if probs exist (classification results)
+            if cls_results.probs is None:
+                return {
+                    "success": False,
+                    "error": "No classification probabilities returned",
+                    "predictions": [],
+                    "best_prediction": None
+                }
+            
+            # Get top-k predictions
+            probs_data = cls_results.probs.data.cpu().numpy()
+            top_indices = probs_data.argsort()[-top_k:][::-1]  # Get top k indices, highest first
+            
+            predictions = []
+            for rank, idx in enumerate(top_indices, start=1):
+                class_name = self.model.names[int(idx)]
+                confidence = float(probs_data[idx])
+                
+                # Format class name: replace underscores/dashes with spaces and title case
+                pretty_name = class_name.replace("_", " ").replace("-", " ").title()
+                
+                predictions.append({
+                    "rank": rank,
+                    "class_name": pretty_name,
+                    "scientific_name": pretty_name,  # Use same as class_name (will be updated by DB lookup)
+                    "raw_class_name": class_name,
+                    "confidence": confidence,
+                    "confidence_percentage": confidence * 100,
+                    "class_id": int(idx)
+                })
+            
+            # Best prediction is the first one (highest confidence)
+            best_prediction = predictions[0] if predictions else None
+            
+            # Log the result
+            if best_prediction:
+                logger.info(f"Classification complete: {best_prediction['class_name']} "
+                           f"(confidence={best_prediction['confidence']:.3f})")
+            else:
+                logger.info("Classification complete: No predictions")
+            
+            return {
+                "success": True,
+                "predictions": predictions,
+                "best_prediction": best_prediction
+            }
+            
+        except Exception as e:
+            logger.error(f"Classification error: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": str(e),
+                "predictions": [],
+                "best_prediction": None
+            }
+    
     def classify(self, crop_path: str) -> Dict[str, Any]:
         """
         Classify snake species from cropped image.
@@ -107,6 +189,21 @@ class SnakeClassifier:
                 "predicted_class": None,
                 "confidence": 0.0
             }
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """
+        Get information about the classification model.
+        
+        Returns:
+            Dict containing model information
+        """
+        return {
+            "model_type": "YOLOv8s Classification",
+            "model_path": settings.classification_model_path,
+            "device": self.device,
+            "num_classes": len(self.class_names),
+            "task": "Snake Species Classification using probs.top1"
+        }
 
 
 # Global classifier instance

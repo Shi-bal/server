@@ -182,28 +182,21 @@ async def identify_snake(
         snake_info = None
         if classification_successful and best_prediction:
             try:
-                # Use the predicted class name (which is the common name formatted)
-                predicted_class = classification_result.get("predicted_class")
-                scientific_name = best_prediction.get("scientific_name") or predicted_class
+                # Get the predicted class name from best_prediction (formatted name)
+                predicted_class = best_prediction.get("class_name")  # This is the formatted name
                 
-                if scientific_name or predicted_class:
-                    lookup_name = scientific_name if scientific_name else predicted_class
-                    logger.info(f"Looking up snake info for: {lookup_name}")
+                if predicted_class:
+                    logger.info(f"Looking up snake info for: {predicted_class}")
                     
                     # Look up by common name (which matches classifier output)
-                    snake_data = await db_manager.get_snake_by_common_name(lookup_name)
-                    
-                    # If not found and we have a different predicted_class, try that
-                    if not snake_data and predicted_class and predicted_class != lookup_name:
-                        logger.info(f"Trying common name lookup: {predicted_class}")
-                        snake_data = await db_manager.get_snake_by_common_name(predicted_class)
+                    snake_data = await db_manager.get_snake_by_common_name(predicted_class)
                     
                     if snake_data:
                         snake_info = snake_data
                         logger.info(f"Found snake info: {snake_data.get('common_name', 'Unknown')}")
                         logger.info(f"Reference image URL: {snake_data.get('image_url', 'None')}")
                     else:
-                        logger.warning(f"No database entry found for: {lookup_name}")
+                        logger.warning(f"No database entry found for: {predicted_class}")
                         
             except Exception as e:
                 logger.error(f"Database lookup failed: {e}")
@@ -218,9 +211,11 @@ async def identify_snake(
         # Create message
         if overall_success:
             if snake_info:
-                message = f"Snake identified as {snake_info.get('common_name', 'Unknown')} ({best_prediction.get('scientific_name', 'Unknown')})"
+                predicted_name = best_prediction.get('class_name', 'Unknown') if best_prediction else 'Unknown'
+                message = f"Snake identified as {snake_info.get('common_name', 'Unknown')} (confidence: {best_prediction.get('confidence', 0):.2%})"
             else:
-                message = f"Snake classified as {best_prediction.get('scientific_name', 'Unknown')} (not found in database)"
+                predicted_name = best_prediction.get('class_name', 'Unknown') if best_prediction else 'Unknown'
+                message = f"Snake classified as {predicted_name} (not found in database)"
         else:
             message = "Snake identification incomplete"
         
@@ -339,6 +334,35 @@ async def get_snakes_with_antivenom():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve snakes with antivenom from database"
+        )
+
+
+@router.get(
+    "/snakes/medically-significant",
+    summary="Get all medically significant snakes",
+    description="Retrieve all Extremely Venomous and Highly Venomous snakes (regardless of antivenom availability). Use this for snake identification dropdown to allow finding nearest facilities even without specific antivenom."
+)
+async def get_medically_significant_snakes():
+    """
+    Get all medically significant snakes (Extremely Venomous and Highly Venomous).
+    This includes snakes with or without antivenom availability.
+    Used for snake identification to enable fallback to nearest facilities.
+    """
+    try:
+        snakes = await db_manager.get_medically_significant_snakes()
+        
+        return {
+            "success": True,
+            "count": len(snakes),
+            "snakes": snakes,
+            "message": f"Found {len(snakes)} medically significant snake species"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error retrieving medically significant snakes: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve medically significant snakes from database"
         )
 
 
