@@ -102,8 +102,33 @@ class SnakeClassifier:
                 })
             
             # Best prediction is the first one (highest confidence)
-            best_prediction = predictions[0] if predictions else None
+                best_prediction = predictions[0] if predictions else None
             
+                # Enforce 90% confidence threshold
+                threshold = 0.9
+                if best_prediction and best_prediction["confidence"] < threshold:
+                    # Label as unknown if below threshold
+                    best_prediction = {
+                        "rank": 1,
+                        "class_name": "Unknown",
+                        "scientific_name": "Unknown",
+                        "raw_class_name": "Unknown",
+                        "confidence": best_prediction["confidence"],
+                        "confidence_percentage": best_prediction["confidence"] * 100,
+                        "class_id": None
+                    }
+                    logger.info(f"Classification below threshold: labeled as Unknown (confidence={best_prediction['confidence']:.3f})")
+                elif best_prediction:
+                    logger.info(f"Classification complete: {best_prediction['class_name']} "
+                               f"(confidence={best_prediction['confidence']:.3f})")
+                else:
+                    logger.info("Classification complete: No predictions")
+
+                return {
+                    "success": True,
+                    "predictions": predictions,
+                    "best_prediction": best_prediction
+                }
             # Log the result
             if best_prediction:
                 logger.info(f"Classification complete: {best_prediction['class_name']} "

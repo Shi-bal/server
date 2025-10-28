@@ -101,7 +101,7 @@ class DetectionResult(BaseModel):
 class ClassificationPrediction(BaseModel):
     """Model for classification prediction"""
     rank: int
-    class_id: int
+    class_id: Optional[int]  # Allow None for 'Unknown'
     class_name: str
     scientific_name: str
     confidence: float
