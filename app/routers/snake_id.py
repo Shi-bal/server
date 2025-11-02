@@ -96,7 +96,19 @@ async def identify_snake(
                 content = await image.read()
                 buffer.write(content)
             
-            logger.info(f"Image saved to {original_path}")
+            # Log detailed image information
+            from PIL import Image as PILImage
+            with PILImage.open(original_path) as pil_img:
+                file_size_kb = os.path.getsize(original_path) / 1024
+                logger.info(f"=== IMAGE UPLOAD INFO ===")
+                logger.info(f"Original filename: {image.filename}")
+                logger.info(f"Saved to: {original_path}")
+                logger.info(f"ACTUAL dimensions: {pil_img.size[0]}x{pil_img.size[1]} (W x H)")
+                logger.info(f"File size: {file_size_kb:.1f} KB")
+                logger.info(f"Image format: {pil_img.format}")
+                logger.info(f"Image mode: {pil_img.mode}")
+                logger.info(f"Confidence threshold: {confidence_threshold}")
+                logger.info(f"========================")
             
         except Exception as e:
             logger.error(f"Failed to save uploaded file: {e}")
@@ -178,28 +190,47 @@ async def identify_snake(
         predictions = classification_result.get("predictions", [])
         best_prediction = classification_result.get("best_prediction")
         
-        # Step 3: Database lookup for species information
+        # Step 3: Database lookup for species information (for all top 5 predictions)
         snake_info = None
-        if classification_successful and best_prediction:
+        
+        if classification_successful and predictions:
             try:
-                # Get the predicted class name from best_prediction (formatted name)
-                predicted_class = best_prediction.get("class_name")  # This is the formatted name
+                # Check if best_prediction is "Unknown Snake" (below 90% threshold)
+                is_unknown = best_prediction and best_prediction.get("class_name") == "Unknown Snake"
                 
-                if predicted_class:
-                    logger.info(f"Looking up snake info for: {predicted_class}")
+                # Enrich all predictions with database information
+                for prediction in predictions:
+                    predicted_class = prediction.get("class_name")
                     
-                    # Look up by common name (which matches classifier output)
-                    snake_data = await db_manager.get_snake_by_common_name(predicted_class)
-                    
-                    if snake_data:
-                        snake_info = snake_data
-                        logger.info(f"Found snake info: {snake_data.get('common_name', 'Unknown')}")
-                        logger.info(f"Reference image URL: {snake_data.get('image_url', 'None')}")
-                    else:
-                        logger.warning(f"No database entry found for: {predicted_class}")
-                        
+                    if predicted_class and predicted_class not in ["Unknown", "Unknown Snake"]:
+                        try:
+                            logger.info(f"Looking up snake info for rank {prediction['rank']}: {predicted_class}")
+                            
+                            # Look up by common name (which matches classifier output)
+                            snake_data = await db_manager.get_snake_by_common_name(predicted_class)
+                            
+                            if snake_data:
+                                # Update prediction with database information
+                                prediction["scientific_name"] = snake_data.get("scientific_name", predicted_class)
+                                prediction["image_url"] = snake_data.get("image_url")
+                                
+                                # If this is the best prediction AND not unknown, store its full info
+                                if prediction["rank"] == 0 and best_prediction and not is_unknown:
+                                    snake_info = snake_data
+                                    best_prediction["scientific_name"] = snake_data.get("scientific_name", predicted_class)
+                                    best_prediction["image_url"] = snake_data.get("image_url")
+                                    
+                                logger.info(f"Found snake info for {predicted_class}: {snake_data.get('scientific_name', 'Unknown')}")
+                            else:
+                                logger.warning(f"No database entry found for: {predicted_class}")
+                                prediction["image_url"] = None
+                                
+                        except Exception as e:
+                            logger.error(f"Database lookup failed for {predicted_class}: {e}")
+                            prediction["image_url"] = None
+                            
             except Exception as e:
-                logger.error(f"Database lookup failed: {e}")
+                logger.error(f"Error during database lookup: {e}")
                 # Don't raise exception here, just log the error
         
         # Step 4: Compile response
@@ -208,14 +239,26 @@ async def identify_snake(
         # Determine overall success
         overall_success = detection_successful and classification_successful
         
-        # Create message
+        # Create message based on confidence level
         if overall_success:
-            if snake_info:
-                predicted_name = best_prediction.get('class_name', 'Unknown') if best_prediction else 'Unknown'
-                message = f"Snake identified as {snake_info.get('common_name', 'Unknown')} (confidence: {best_prediction.get('confidence', 0):.2%})"
+            if best_prediction:
+                best_confidence = best_prediction.get('confidence', 0)
+                predicted_name = best_prediction.get('class_name', 'Unknown')
+                
+                if predicted_name == "Unknown Snake":
+                    # Below 90% threshold - show as unknown with all candidates
+                    message = f"Confidence too low for definitive identification (highest: {best_confidence:.2%}). Please review all top 5 candidates carefully."
+                elif best_confidence >= 0.90:
+                    # High confidence (≥90%) - clear identification
+                    if snake_info:
+                        message = f"Snake identified as {snake_info.get('common_name', 'Unknown')} (confidence: {best_confidence:.2%}). Top 5 predictions included."
+                    else:
+                        message = f"Snake classified as {predicted_name} (confidence: {best_confidence:.2%}). Top 5 predictions included."
+                else:
+                    # This case shouldn't happen due to 90% threshold, but keeping for safety
+                    message = f"Multiple possible matches detected (highest confidence: {best_confidence:.2%}). Review top 5 candidates."
             else:
-                predicted_name = best_prediction.get('class_name', 'Unknown') if best_prediction else 'Unknown'
-                message = f"Snake classified as {predicted_name} (not found in database)"
+                message = "Snake classification returned no results"
         else:
             message = "Snake identification incomplete"
         

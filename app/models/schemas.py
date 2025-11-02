@@ -11,7 +11,7 @@ from datetime import datetime, date
 class SnakeIdRequest(BaseModel):
     """Request model for snake identification (used for form data validation)"""
     confidence_threshold: Optional[float] = Field(
-        default=0.5, 
+        default=0.3, 
         ge=0.0, 
         le=1.0, 
         description="Confidence threshold for detection (0.0-1.0)"
@@ -107,6 +107,7 @@ class ClassificationPrediction(BaseModel):
     confidence: float
     confidence_percentage: float
     confidence_level: Optional[str] = None
+    image_url: Optional[str] = None  # Snake reference image from database
 
 
 class SnakeInfo(BaseModel):

@@ -6,6 +6,7 @@ This implementation matches the working web app pipeline using probs.top1.
 import logging
 import os
 import torch
+import re
 from typing import Dict, Any
 from ultralytics import YOLO
 
@@ -75,9 +76,8 @@ class SnakeClassifierProbs:
                 class_name = self.model.names[class_id]
                 confidence = float(cls_results.probs.top1conf)
                 
-                # Format class name: replace underscores/dashes with spaces and title case
-                # This handles both "Common_Mock_Viper" and "Common-Mock-Viper" formats
-                pretty_name = class_name.replace("_", " ").replace("-", " ").title()
+                s = re.sub(r"\s*-\s*", "-", class_name)
+                pretty_name = s.replace("_", " ").strip().title()
                 
                 logger.info(f"Classified as: {pretty_name} (confidence={confidence:.3f})")
                 

@@ -45,11 +45,7 @@ async def init_db():
         # Initialize Supabase client with custom HTTP client
         supabase = create_client(
             settings.supabase_url, 
-            settings.supabase_service_key,
-            options={
-                'auto_refresh_token': True,
-                'persist_session': True,
-            }
+            settings.supabase_service_key
         )
         
         # Patch the Supabase client to use our custom HTTP client

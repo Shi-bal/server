@@ -6,6 +6,7 @@ This implementation uses probs.top1 for proper classification results.
 import logging
 import os
 import torch
+import re
 from typing import Dict, Any
 from ultralytics import YOLO
 
@@ -45,6 +46,27 @@ class SnakeClassifier:
             logger.error(f"Failed to load classification model: {e}")
             raise
     
+    def _get_confidence_level(self, confidence: float) -> str:
+        """
+        Categorize confidence level based on confidence score
+        
+        Args:
+            confidence: Confidence score between 0 and 1
+            
+        Returns:
+            String describing confidence level
+        """
+        if confidence >= 0.90:
+            return "Very High"
+        elif confidence >= 0.80:
+            return "High"
+        elif confidence >= 0.65:
+            return "Medium"
+        elif confidence >= 0.50:
+            return "Low"
+        else:
+            return "Very Low"
+    
     
     def classify_with_confidence_analysis(self, image_path: str, top_k: int = 5) -> Dict[str, Any]:
         """
@@ -83,13 +105,27 @@ class SnakeClassifier:
             probs_data = cls_results.probs.data.cpu().numpy()
             top_indices = probs_data.argsort()[-top_k:][::-1]  # Get top k indices, highest first
             
+            # Minimum confidence threshold to include a prediction (filter out 0% or near-0%)
+            min_confidence_threshold = 0.01  # 1% - anything below this is ignored
+            
             predictions = []
-            for rank, idx in enumerate(top_indices, start=1):
+            rank = 0
+            for idx in top_indices:
                 class_name = self.model.names[int(idx)]
                 confidence = float(probs_data[idx])
                 
-                # Format class name: replace underscores/dashes with spaces and title case
-                pretty_name = class_name.replace("_", " ").replace("-", " ").title()
+                # Skip predictions with negligible confidence (0.0% or very close)
+                if confidence < min_confidence_threshold:
+                    logger.debug(f"Skipping prediction with negligible confidence: {class_name} ({confidence:.4f})")
+                    continue
+                
+                # Preserve hyphens, normalize hyphen spacing, replace underscores with spaces, then title case
+                # Example: "Dog-Toothed_Cat_Snake" -> "Dog-Toothed Cat Snake"
+                s = re.sub(r"\s*-\s*", "-", class_name)
+                pretty_name = s.replace("_", " ").strip().title()
+                
+                # Get confidence level
+                confidence_level = self._get_confidence_level(confidence)
                 
                 predictions.append({
                     "rank": rank,
@@ -98,41 +134,42 @@ class SnakeClassifier:
                     "raw_class_name": class_name,
                     "confidence": confidence,
                     "confidence_percentage": confidence * 100,
+                    "confidence_level": confidence_level,
                     "class_id": int(idx)
                 })
+                rank += 1
+            
+            removed_count = top_k - len(predictions)
+            min_conf_percent = min_confidence_threshold * 100
+            if removed_count > 0:
+                logger.info(f"Filtered predictions: {len(predictions)} out of {top_k} (removed {removed_count} with confidence below {min_conf_percent:.0f}%)")
             
             # Best prediction is the first one (highest confidence)
-                best_prediction = predictions[0] if predictions else None
+            best_prediction = predictions[0].copy() if predictions else None
             
-                # Enforce 90% confidence threshold
-                threshold = 0.9
-                if best_prediction and best_prediction["confidence"] < threshold:
-                    # Label as unknown if below threshold
-                    best_prediction = {
-                        "rank": 1,
-                        "class_name": "Unknown",
-                        "scientific_name": "Unknown",
-                        "raw_class_name": "Unknown",
-                        "confidence": best_prediction["confidence"],
-                        "confidence_percentage": best_prediction["confidence"] * 100,
-                        "class_id": None
-                    }
-                    logger.info(f"Classification below threshold: labeled as Unknown (confidence={best_prediction['confidence']:.3f})")
-                elif best_prediction:
-                    logger.info(f"Classification complete: {best_prediction['class_name']} "
-                               f"(confidence={best_prediction['confidence']:.3f})")
-                else:
-                    logger.info("Classification complete: No predictions")
-
-                return {
-                    "success": True,
-                    "predictions": predictions,
-                    "best_prediction": best_prediction
+            # Enforce 90% confidence threshold
+            threshold = 0.9
+            if best_prediction and best_prediction["confidence"] < threshold:
+                # Label as unknown if below threshold
+                original_confidence = best_prediction["confidence"]
+                original_name = best_prediction["class_name"]
+                
+                best_prediction = {
+                    "rank": 0,
+                    "class_name": "Unknown Snake",
+                    "scientific_name": "Unknown",
+                    "raw_class_name": "Unknown",
+                    "confidence": original_confidence,
+                    "confidence_percentage": original_confidence * 100,
+                    "confidence_level": self._get_confidence_level(original_confidence),
+                    "class_id": None,
+                    "image_url": None
                 }
-            # Log the result
-            if best_prediction:
+                logger.info(f"Classification below threshold ({threshold*100}%): {original_name} "
+                           f"(confidence={original_confidence:.3f}) → labeled as Unknown Snake")
+            elif best_prediction:
                 logger.info(f"Classification complete: {best_prediction['class_name']} "
-                           f"(confidence={best_prediction['confidence']:.3f})")
+                           f"(confidence={best_prediction['confidence']:.3f}, level={best_prediction['confidence_level']})")
             else:
                 logger.info("Classification complete: No predictions")
             
@@ -183,9 +220,10 @@ class SnakeClassifier:
                 class_name = self.model.names[class_id]
                 confidence = float(cls_results.probs.top1conf)
                 
-                # Format class name: replace underscores/dashes with spaces and title case
-                # This handles both "Common_Mock_Viper" and "Common-Mock-Viper" formats
-                pretty_name = class_name.replace("_", " ").replace("-", " ").title()
+                # Preserve hyphens, normalize hyphen spacing, replace underscores with spaces, then title case
+                # Example: "Dog-Toothed_Cat_Snake" -> "Dog-Toothed Cat Snake"
+                s = re.sub(r"\s*-\s*", "-", class_name)
+                pretty_name = s.replace("_", " ").strip().title()
                 
                 logger.info(f"Classified as: {pretty_name} (confidence={confidence:.3f})")
                 

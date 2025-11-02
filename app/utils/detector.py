@@ -42,7 +42,7 @@ class SnakeDetector:
             logger.error(f"Failed to load detection model: {e}")
             raise
     
-    def detect_and_crop(self, image_path: str, confidence_threshold: float = 0.5):
+    def detect_and_crop(self, image_path: str, confidence_threshold: float = 0.25):
         """
         Detect snake and return the first detection with its cropped image path.
         This is the method called by the snake_id endpoint.
@@ -73,7 +73,7 @@ class SnakeDetector:
         
         return detection_result, cropped_path
     
-    def detect_snake(self, image_path: str, confidence_threshold: float = 0.5) -> Dict[str, Any]:
+    def detect_snake(self, image_path: str, confidence_threshold: float = 0.3) -> Dict[str, Any]:
         """
         Detect snake using OBB and create perspective-corrected crops.
         This matches the working pipeline with proper OBB handling.
@@ -102,8 +102,14 @@ class SnakeDetector:
                     "detections": []
                 }
             
-            # Run YOLOv8-obb prediction
-            results = self.model.predict(image_path)[0]
+            # Log image details before detection
+            test_img = cv2.imread(image_path)
+            if test_img is not None:
+                logger.info(f"Image loaded by OpenCV: shape={test_img.shape} (H, W, C)")
+            
+            # Run YOLOv8-obb prediction with confidence threshold
+            logger.info(f"Running detection with confidence threshold: {confidence_threshold}")
+            results = self.model.predict(image_path, conf=confidence_threshold, verbose=True)[0]
             
             detections = []
             

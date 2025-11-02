@@ -41,7 +41,7 @@ class SnakeDetectorOBB:
             logger.error(f"Failed to load detection model: {e}")
             raise
     
-    def detect_and_crop(self, image_path: str, confidence_threshold: float = 0.5) -> Dict[str, Any]:
+    def detect_and_crop(self, image_path: str, confidence_threshold: float = 0.3) -> Dict[str, Any]:
         """
         Detect snake using OBB and create perspective-corrected crops.
         This matches the working pipeline from your web app.
@@ -70,8 +70,9 @@ class SnakeDetectorOBB:
                     "detections": []
                 }
             
-            # Run YOLOv8-obb prediction
-            results = self.model.predict(image_path)[0]
+            # Run YOLOv8-obb prediction with confidence threshold
+            logger.info(f"Running detection with confidence threshold: {confidence_threshold}")
+            results = self.model.predict(image_path, conf=confidence_threshold)[0]
             
             detections = []
             
