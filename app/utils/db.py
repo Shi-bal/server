@@ -25,32 +25,15 @@ async def init_db():
     global db_pool, supabase
     
     try:
-        # Create custom httpx client with increased timeouts for SSL handshake and requests
-        # Timeout configuration: connect=10s, read=60s, write=60s, pool=60s
-        timeout_config = httpx.Timeout(
-            timeout=60.0,      # Default timeout for all operations
-            connect=10.0,      # Connection timeout (includes SSL handshake)
-            read=60.0,         # Read timeout
-            write=60.0,        # Write timeout
-            pool=60.0          # Pool timeout
-        )
+        # Debug: Log the URLs being used
+        logger.info(f"DEBUG: Supabase URL from settings: {settings.supabase_url}")
+        logger.info(f"DEBUG: Service key (first 20 chars): {settings.supabase_service_key[:20]}...")
         
-        # Create httpx client with retry configuration
-        http_client = httpx.Client(
-            timeout=timeout_config,
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
-            verify=True  # Enable SSL verification
-        )
-        
-        # Initialize Supabase client with custom HTTP client
+        # Initialize Supabase client
         supabase = create_client(
             settings.supabase_url, 
             settings.supabase_service_key
         )
-        
-        # Patch the Supabase client to use our custom HTTP client
-        if hasattr(supabase, 'postgrest'):
-            supabase.postgrest.session = http_client
         
         logger.info("✅ Supabase client initialized successfully with service role key")
         logger.info("   Service role key bypasses RLS policies automatically")
@@ -371,10 +354,10 @@ class DatabaseManager:
                 'facility_id, facility_name, facility_type, region, province, city_municipality, address, latitude, longitude, contact_number, facility_email, image_url'
             ).in_('facility_id', facility_ids).execute()
             
-            # Step 6: Fetch antivenoms data separately
+            # Step 6: Fetch antivenoms data separately (IMPORTANT: Filter by type_id to ensure correct type)
             antivenoms_data = client.table('antivenoms').select(
                 'antivenom_id, product_name, manufacturer'
-            ).in_('antivenom_id', antivenom_ids_in_stock).execute()
+            ).in_('antivenom_id', antivenom_ids_in_stock).eq('type_id', type_id).execute()
             
             # Create lookup dictionaries
             facilities_lookup = {f['facility_id']: f for f in facilities_data.data}

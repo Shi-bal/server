@@ -137,7 +137,29 @@ async def find_antivenom(request: AntivenomFinderRequest):
         
         # Check if any facilities found
         if not facilities_data:
-            # FALLBACK: If no facilities with specific antivenom found, get nearest facilities
+            # FALLBACK: Only for mobile app (snake searches)
+            # Web app (antivenom_type searches) should NOT use fallback
+            if request.antivenom_type:
+                # Web app search - no fallback, just return message
+                processing_time = time.time() - start_time
+                return AntivenomFinderResponse(
+                    success=True,
+                    message=f"No facilities found with {request.antivenom_type} antivenom",
+                    search_criteria={
+                        "snake_id": snake_id,
+                        "snake_common_name": request.snake_common_name,
+                        "antivenom_type": request.antivenom_type,
+                        "user_location": [request.user_latitude, request.user_longitude],
+                        "max_distance_km": request.max_distance_km
+                    },
+                    facilities_found=0,
+                    facilities=[],
+                    search_radius_km=request.max_distance_km,
+                    user_location=[request.user_latitude, request.user_longitude],
+                    processing_time_seconds=round(processing_time, 2)
+                )
+            
+            # Mobile app search - use fallback to show nearest facilities
             logger.info("No facilities with specific antivenom found. Fetching nearest facilities as fallback...")
             
             try:
