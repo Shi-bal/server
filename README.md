@@ -9,19 +9,19 @@ VenomX is a comprehensive snake identification and antivenom finder system built
 
 ## Features
 
-### 🐍 Snake Identification
+### Snake Identification
 - YOLOv8s-obb object detection for snake detection and cropping
 - YOLOv8s classification for species identification
 - Confidence analysis and recommendations
 - Database integration for species information
 
-### 🏥 Antivenom Finder
+###Antivenom Finder
 - Find facilities with specific antivenom
 - Distance and travel time calculation using OSRM
 - Facility details with stock information
 - Location-based sorting
 
-### 🚀 Technical Features
+### Technical Features
 - FastAPI framework with automatic API documentation
 - Supabase/PostgreSQL integration
 - Docker containerization
